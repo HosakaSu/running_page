@@ -75,9 +75,20 @@ class TrackLoader:
             "fit": load_fit_file,
         }
 
-    def load_tracks(self, data_dir, file_suffix="gpx", activity_title_dict={}):
+    def load_tracks(
+        self,
+        data_dir,
+        file_suffix="gpx",
+        activity_title_dict={},
+        ignore_synced=False,
+    ):
         """Load tracks data_dir and return as a List of tracks"""
-        file_names = [x for x in self._list_data_files(data_dir, file_suffix)]
+        file_names = [
+            x
+            for x in self._list_data_files(
+                data_dir, file_suffix, ignore_synced=ignore_synced
+            )
+        ]
         print(f"{file_suffix.upper()} files: {len(file_names)}")
 
         tracks = []
@@ -154,8 +165,8 @@ class TrackLoader:
         return tracks
 
     @staticmethod
-    def _list_data_files(data_dir, file_suffix):
-        synced_files = load_synced_file_list()
+    def _list_data_files(data_dir, file_suffix, ignore_synced=False):
+        synced_files = [] if ignore_synced else load_synced_file_list()
         data_dir = os.path.abspath(data_dir)
         if not os.path.isdir(data_dir):
             raise ParameterError(f"Not a directory: {data_dir}")

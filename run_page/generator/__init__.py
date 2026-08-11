@@ -187,10 +187,19 @@ class Generator:
             sys.stdout.flush()
         self.session.commit()
 
-    def sync_from_data_dir(self, data_dir, file_suffix="gpx", activity_title_dict={}):
+    def sync_from_data_dir(
+        self,
+        data_dir,
+        file_suffix="gpx",
+        activity_title_dict={},
+        ignore_synced=False,
+    ):
         loader = track_loader.TrackLoader()
         tracks = loader.load_tracks(
-            data_dir, file_suffix=file_suffix, activity_title_dict=activity_title_dict
+            data_dir,
+            file_suffix=file_suffix,
+            activity_title_dict=activity_title_dict,
+            ignore_synced=ignore_synced,
         )
         print(f"load {len(tracks)} tracks")
         if not tracks:
@@ -210,7 +219,8 @@ class Generator:
             synced_files.extend(t.file_names)
             sys.stdout.flush()
 
-        save_synced_data_file_list(synced_files)
+        if not ignore_synced:
+            save_synced_data_file_list(synced_files)
 
         self.session.commit()
 

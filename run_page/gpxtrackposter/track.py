@@ -16,7 +16,10 @@ import polyline
 import s2sphere as s2
 from garmin_fit_sdk import Decoder, Stream
 from garmin_fit_sdk.util import FIT_EPOCH_S
-from polyline_processor import filter_out
+try:
+    from run_page.polyline_processor import filter_out
+except ModuleNotFoundError:
+    from polyline_processor import filter_out
 from rich import print
 from tcxreader.tcxreader import TCXReader
 
@@ -56,6 +59,7 @@ class Track:
         self.type = "Run"
         self.subtype = None  # for fit file
         self.device = ""
+        self.location_country = ""
 
     def load_gpx(self, file_name):
         """
@@ -207,15 +211,12 @@ class Track:
     def _calc_moving_time(self, trackpoints, seconds_threshold=10):
         moving_time = 0
         try:
-            start_time = self.start_time
-            for i in range(1, len(trackpoints)):
-                if trackpoints[i].time - trackpoints[i - 1].time <= datetime.timedelta(
+            for previous, current in zip(trackpoints, trackpoints[1:]):
+                delta = current.time - previous.time
+                if datetime.timedelta(0) <= delta <= datetime.timedelta(
                     seconds=seconds_threshold
                 ):
-                    moving_time += (
-                        trackpoints[i].time.timestamp() - start_time.timestamp()
-                    )
-                start_time = trackpoints[i].time
+                    moving_time += delta.total_seconds()
             return int(moving_time)
         except Exception as e:
             print(f"Error calculating moving time: {e}")
@@ -362,6 +363,11 @@ class Track:
             if gpx_extensions.get("elapsed_time") is None
             else datetime.timedelta(seconds=float(gpx_extensions.get("elapsed_time")))
         )
+        self.location_country = (
+            self.location_country
+            if gpx_extensions.get("location_country") is None
+            else gpx_extensions.get("location_country")
+        )
 
     def _load_fit_data(self, fit: dict):
         _polylines = []
@@ -487,6 +493,7 @@ class Track:
             "elevation_gain": (int(self.elevation_gain) if self.elevation_gain else 0),
             "map": run_map(self.polyline_str),
             "start_latlng": self.start_latlng,
+            "location_country": self.location_country,
         }
         d.update(self.moving_dict)
         # return a nametuple that can use . to get attr
