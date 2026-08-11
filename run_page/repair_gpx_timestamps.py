@@ -24,7 +24,6 @@ from statistics import median
 
 from lxml import etree
 
-
 JOYRUN_PAUSE_OFFSET_SECONDS = 100_000
 DEFAULT_SAMPLE_INTERVAL_SECONDS = 5
 DEFAULT_MAX_REPAIRED_GAP_SECONDS = 3_600
@@ -105,14 +104,9 @@ def repair_timeline(
         reason = ""
 
         if original_delta < 0 or original_delta >= pause_offset_seconds // 2:
-            offset_count = _nearest_offset_count(
-                original_delta, pause_offset_seconds
-            )
+            offset_count = _nearest_offset_count(original_delta, pause_offset_seconds)
             offset_candidate = original_delta - offset_count * pause_offset_seconds
-            if (
-                offset_count != 0
-                and 0 <= offset_candidate <= max_repaired_gap_seconds
-            ):
+            if offset_count != 0 and 0 <= offset_candidate <= max_repaired_gap_seconds:
                 repaired_delta = offset_candidate
                 reason = "joyrun_pause_offset"
             elif original_delta < 0:
@@ -136,9 +130,7 @@ def repair_timeline(
 
 
 def _is_joyrun(tree: etree._ElementTree) -> bool:
-    names = tree.xpath(
-        "//*[local-name()='trk']/*[local-name()='name']/text()"
-    )
+    names = tree.xpath("//*[local-name()='trk']/*[local-name()='name']/text()")
     return any(str(name).lower().startswith("gpx from joyrun ") for name in names)
 
 
@@ -160,21 +152,13 @@ def _set_root_extension(
     extension_tag = f"{{{namespace}}}extensions" if namespace else "extensions"
     item_tag = f"{{{namespace}}}{item_name}" if namespace else item_name
     extensions = next(
-        (
-            child
-            for child in root
-            if etree.QName(child).localname == "extensions"
-        ),
+        (child for child in root if etree.QName(child).localname == "extensions"),
         None,
     )
     if extensions is None:
         extensions = etree.SubElement(root, extension_tag)
     item = next(
-        (
-            child
-            for child in extensions
-            if etree.QName(child).localname == item_name
-        ),
+        (child for child in extensions if etree.QName(child).localname == item_name),
         None,
     )
     if item is None:
@@ -222,9 +206,7 @@ def repair_gpx_file(
 
     time_elements = [
         element
-        for element in tree.xpath(
-            "//*[local-name()='trkpt']/*[local-name()='time']"
-        )
+        for element in tree.xpath("//*[local-name()='trkpt']/*[local-name()='time']")
         if element.text
     ]
     original_values = [element.text for element in time_elements]
@@ -236,9 +218,7 @@ def repair_gpx_file(
     )
     metadata_fields: tuple[str, ...] = ()
     if reference_activity is not None:
-        elapsed_time_seconds = max(
-            0, int((repaired[-1] - repaired[0]).total_seconds())
-        )
+        elapsed_time_seconds = max(0, int((repaired[-1] - repaired[0]).total_seconds()))
         metadata_fields = _add_reference_metadata(
             tree, reference_activity, elapsed_time_seconds
         )

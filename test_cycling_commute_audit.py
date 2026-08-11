@@ -8,7 +8,6 @@ from run_page.audit_cycling_commutes import (
     percentile,
 )
 
-
 HOME = (34.0, 119.0)
 WORK = (34.02, 119.01)
 ROUTES = (CommuteRoute("test_home", HOME, WORK),)
