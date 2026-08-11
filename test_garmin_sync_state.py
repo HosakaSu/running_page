@@ -14,6 +14,7 @@ def test_state_is_sorted_and_only_rewritten_when_changed(tmp_path):
 
     assert save_activity_ids(state, {"20", "3"}) is True
     assert json.loads(state.read_text(encoding="utf-8")) == ["3", "20"]
+    assert state.read_text(encoding="utf-8") == '[\n  "3",\n  "20"\n]\n'
     original = state.read_bytes()
 
     assert save_activity_ids(state, {"3", "20"}) is False

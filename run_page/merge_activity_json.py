@@ -55,8 +55,6 @@ def merge_preserving_existing(
         ),
     )
     temporary = activities_json.with_suffix(f"{activities_json.suffix}.tmp")
-    temporary.write_text(
-        json.dumps(ordered, ensure_ascii=False), encoding="utf-8"
-    )
+    temporary.write_text(json.dumps(ordered, ensure_ascii=False), encoding="utf-8")
     os.replace(temporary, activities_json)
     return len(ordered) - len(existing)

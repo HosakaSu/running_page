@@ -20,7 +20,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable
 
-
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_GPX_DIR = ROOT / "GPX_OUT"
 DEFAULT_DATABASE = ROOT / "run_page" / "data.db"
@@ -48,9 +47,7 @@ class RouteMatch:
     reason: str
 
 
-def haversine_metres(
-    first: tuple[float, float], second: tuple[float, float]
-) -> float:
+def haversine_metres(first: tuple[float, float], second: tuple[float, float]) -> float:
     """Return great-circle distance between two latitude/longitude points."""
     radius = 6_371_008.8
     lat1, lon1 = map(math.radians, first)
@@ -231,14 +228,12 @@ def load_activities(database: Path) -> dict[tuple[str, str], sqlite3.Row]:
     connection = sqlite3.connect(database)
     connection.row_factory = sqlite3.Row
     try:
-        rows = connection.execute(
-            """
+        rows = connection.execute("""
             SELECT run_id, name, distance, moving_time, type, start_date_local,
                    average_speed
               FROM activities
              WHERE substr(start_date_local, 1, 4) IN ('2023', '2024', '2025')
-            """
-        ).fetchall()
+            """).fetchall()
     finally:
         connection.close()
     return {(row["name"], row["start_date_local"]): row for row in rows}
@@ -382,9 +377,7 @@ def main() -> None:
     args = parser.parse_args()
 
     routes, confirmed_rides = load_config(args.config)
-    rows, unmatched = build_rows(
-        args.gpx_dir, args.database, routes, confirmed_rides
-    )
+    rows, unmatched = build_rows(args.gpx_dir, args.database, routes, confirmed_rides)
     if not rows:
         raise SystemExit("No suspected commute routes found")
     write_csv(rows, args.output)

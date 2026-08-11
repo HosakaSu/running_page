@@ -15,6 +15,7 @@ import polyline
 import s2sphere as s2
 from garmin_fit_sdk import Decoder, Stream
 from garmin_fit_sdk.util import FIT_EPOCH_S
+
 try:
     from run_page.polyline_processor import filter_out
 except ModuleNotFoundError:
@@ -213,8 +214,10 @@ class Track:
         try:
             for previous, current in zip(trackpoints, trackpoints[1:]):
                 delta = current.time - previous.time
-                if datetime.timedelta(0) <= delta <= datetime.timedelta(
-                    seconds=seconds_threshold
+                if (
+                    datetime.timedelta(0)
+                    <= delta
+                    <= datetime.timedelta(seconds=seconds_threshold)
                 ):
                     moving_time += delta.total_seconds()
             return int(moving_time)
@@ -456,18 +459,16 @@ class Track:
                 f"something wrong append this {self.end_time},in files {self.file_names!s}: {e}"
             )
 
-    @staticmethod
-    def _get_moving_data(gpx, moving_time):
+    def _get_moving_data(self, gpx, moving_time):
         moving_data = gpx.get_moving_data()
         elapsed_time = moving_data.moving_time
         moving_time = moving_time or elapsed_time
+        moving_distance = moving_data.moving_distance or self.length
         return {
-            "distance": moving_data.moving_distance,
+            "distance": moving_distance,
             "moving_time": datetime.timedelta(seconds=moving_time),
             "elapsed_time": datetime.timedelta(seconds=elapsed_time),
-            "average_speed": (
-                moving_data.moving_distance / moving_time if moving_time else 0
-            ),
+            "average_speed": (moving_distance / moving_time if moving_time else 0),
         }
 
     def to_namedtuple(self, run_from="gpx"):

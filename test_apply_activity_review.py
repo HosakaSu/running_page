@@ -123,9 +123,7 @@ def test_running_only_review_can_be_reapplied(tmp_path):
 
 def test_rejects_unknown_decision(tmp_path):
     review_file = tmp_path / "review.json"
-    review_file.write_text(
-        json.dumps({"decisions": {"1": "delete"}}), encoding="utf-8"
-    )
+    review_file.write_text(json.dumps({"decisions": {"1": "delete"}}), encoding="utf-8")
 
     with pytest.raises(ValueError, match="Invalid review decision"):
         load_review(review_file)

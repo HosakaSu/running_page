@@ -15,7 +15,6 @@ import sqlite3
 from dataclasses import dataclass
 from pathlib import Path
 
-
 ALLOWED_DECISIONS = {"cycling", "keep_running", "unsure"}
 
 
@@ -107,9 +106,7 @@ def apply_review(
                 activity["type"] = "Run"
             rewritten.append(activity)
 
-        backup_dir = _backup_files(
-            database, activities_json, review_file, backup_root
-        )
+        backup_dir = _backup_files(database, activities_json, review_file, backup_root)
         temporary_json = activities_json.with_suffix(".json.tmp")
         temporary_json.write_text(
             json.dumps(rewritten, ensure_ascii=False), encoding="utf-8"
@@ -155,9 +152,7 @@ def build_parser() -> argparse.ArgumentParser:
         type=Path,
         default=Path("src/static/activities.json"),
     )
-    parser.add_argument(
-        "--backup-root", type=Path, default=Path("reports/backups")
-    )
+    parser.add_argument("--backup-root", type=Path, default=Path("reports/backups"))
     parser.add_argument(
         "--running-only-output",
         action="store_true",

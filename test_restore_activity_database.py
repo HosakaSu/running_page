@@ -74,9 +74,7 @@ def test_existing_database_is_never_overwritten(tmp_path):
 def test_duplicate_run_ids_are_rejected_without_partial_rows(tmp_path):
     database = tmp_path / "data.db"
     activities_json = tmp_path / "activities.json"
-    activities_json.write_text(
-        json.dumps([activity(), activity()]), encoding="utf-8"
-    )
+    activities_json.write_text(json.dumps([activity(), activity()]), encoding="utf-8")
 
     with pytest.raises(ValueError, match="duplicate run_id"):
         restore_database_from_json(database, activities_json)

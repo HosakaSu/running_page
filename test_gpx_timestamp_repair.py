@@ -8,7 +8,6 @@ from run_page.repair_gpx_timestamps import (
     repair_timeline,
 )
 
-
 UTC = dt.timezone.utc
 
 

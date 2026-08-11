@@ -36,7 +36,7 @@ def save_activity_ids(path: Path, activity_ids: set[str]) -> bool:
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_suffix(f"{path.suffix}.tmp")
     temporary.write_text(
-        json.dumps(sorted(normalized, key=int), ensure_ascii=False) + "\n",
+        json.dumps(sorted(normalized, key=int), ensure_ascii=False, indent=2) + "\n",
         encoding="utf-8",
     )
     os.replace(temporary, path)
