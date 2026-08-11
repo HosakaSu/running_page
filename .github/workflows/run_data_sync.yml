@@ -25,19 +25,29 @@ on:
       - run_page/intervals_icu_sync.py
       - requirements.txt
 
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: run-data-sync-${{ github.ref }}
+  cancel-in-progress: false
+
 env:
   # please change to your own config.
-  RUN_TYPE: pass # support strava_web/strava/nike/garmin/coros/garmin_cn/garmin_sync_cn_global/keep/only_gpx/only_fit/nike_to_strava/strava_to_garmin/tcx_to_garmin/strava_to_garmin_cn/garmin_to_strava/garmin_to_strava_cn/oppo/intervals_icu/db_updater, Please change the 'pass' it to your own
-  ATHLETE: yihong0618
-  TITLE: Yihong0618 Running
+  RUN_TYPE: garmin # Daily incremental Garmin running sync
+  ATHLETE: HosakaSu
+  TITLE: HosakaSu Running
   MIN_GRID_DISTANCE: 10 # change min distance here
   TITLE_GRID: Over 10km Runs # also here
 
-  # IGNORE_BEFORE_SAVING: True # if you want to ignore some data before saving, set this to True
-  IGNORE_START_END_RANGE: 10 # Unit meter
-  # Dont making this huge, just picking points you needing. https://developers.google.com/maps/documentation/utilities/polylineutility using this tool to making your polyline
-  IGNORE_POLYLINE: 'ktjrFoemeU~IorGq}DeB'
-  IGNORE_RANGE: 10 # Unit meter
+  # Existing JSON routes have already been processed. Keep these at zero so
+  # rebuilding an ephemeral database does not trim the same route every day.
+  IGNORE_START_END_RANGE: 0
+  IGNORE_POLYLINE: ''
+  IGNORE_RANGE: 0
+  SKIP_REVERSE_GEOCODING: true
   USE_CLOUDFLARE_WARP: false # If you want to use Cloudflare WARP to bypass network restrictions, set it to `true`. Currently only Garmin needs this.
   SAVE_DATA_IN_GITHUB_CACHE: false # if you deploy in the vercel, check the README
   DATA_CACHE_PREFIX: 'track_data'
@@ -153,14 +163,50 @@ jobs:
         run: |
           python run_page/strava_web_sync.py "${{ secrets.STRAVA_JWT }}" --days "${{ vars.STRAVA_WEB_DAYS || '7' }}"
 
+      - name: Capture activity baseline
+        if: env.RUN_TYPE == 'garmin'
+        run: |
+          python - <<'PY'
+          import json
+          import os
+
+          with open("src/static/activities.json", encoding="utf-8") as stream:
+              count = len(json.load(stream))
+          with open(os.environ["GITHUB_ENV"], "a", encoding="utf-8") as output:
+              output.write(f"BASELINE_ACTIVITY_COUNT={count}\n")
+          PY
+
       # for garmin if you want generate 'tcx' you can add --tcx command in the args.
       - name: Run sync Garmin script
         if: env.RUN_TYPE == 'garmin'
+        env:
+          GARMIN_SECRET_STRING: ${{ secrets.GARMIN_SECRET_STRING }}
         run: |
-          python run_page/garmin_sync.py ${{ secrets.GARMIN_SECRET_STRING }}
+          test -n "$GARMIN_SECRET_STRING"
+          python run_page/garmin_sync.py "$GARMIN_SECRET_STRING" --only-run
         # make garmin secret string 'python run_page/get_garmin_secret.py ${email} ${password}'
         # If you only want to sync 'type running' add args --only-run, default script is to sync all data (rides and runs).
         # python run_page/garmin_sync.py ${{ secrets.GARMIN_SECRET_STRING }} --only-run
+
+      - name: Verify Garmin merge preserved history
+        if: env.RUN_TYPE == 'garmin'
+        run: |
+          python - <<'PY'
+          import json
+          import os
+
+          with open("src/static/activities.json", encoding="utf-8") as stream:
+              activities = json.load(stream)
+          baseline = int(os.environ["BASELINE_ACTIVITY_COUNT"])
+          run_ids = [int(activity["run_id"]) for activity in activities]
+          if len(activities) < baseline:
+              raise SystemExit(
+                  f"Garmin merge lost history: {baseline} -> {len(activities)}"
+              )
+          if len(run_ids) != len(set(run_ids)):
+              raise SystemExit("Garmin merge created duplicate run_id values")
+          print(f"Verified {len(activities)} activities (baseline: {baseline})")
+          PY
 
       - name: Run sync Garmin CN script
         if: env.RUN_TYPE == 'garmin_cn'
@@ -259,12 +305,7 @@ jobs:
           BIRTHDAY_MONTH: ${{ env.BIRTHDAY_MONTH }}
         run: |
           python run_page/gen_svg.py --from-db --type monthoflife --birth "${{env.BIRTHDAY_MONTH}}" --special-color "#f9d367"  --special-color2 "#f0a1a8" --output assets/mol_running.svg --use-localtime --athlete "${{env.ATHLETE}}" --title "Runner Month of Life" --sport-type running
-          python run_page/gen_svg.py --from-db --type monthoflife --birth "${{env.BIRTHDAY_MONTH}}" --special-color "#f9d367"  --special-color2 "#f0a1a8" --output assets/mol_walking.svg --use-localtime --athlete "${{env.ATHLETE}}" --title "Walker Month of Life" --sport-type walking
-          python run_page/gen_svg.py --from-db --type monthoflife --birth "${{env.BIRTHDAY_MONTH}}" --special-color "#f9d367"  --special-color2 "#f0a1a8" --output assets/mol_hiking.svg --use-localtime --athlete "${{env.ATHLETE}}" --title "Hiker Month of Life" --sport-type hiking
-          python run_page/gen_svg.py --from-db --type monthoflife --birth "${{env.BIRTHDAY_MONTH}}" --special-color "#f9d367"  --special-color2 "#f0a1a8" --output assets/mol_cycling.svg --use-localtime --athlete "${{env.ATHLETE}}" --title "Cyclist Month of Life" --sport-type cycling
           python run_page/gen_svg.py --from-db --type monthoflife --birth "${{env.BIRTHDAY_MONTH}}" --special-color "#f9d367"  --special-color2 "#f0a1a8" --output assets/mol.svg --use-localtime --athlete "${{env.ATHLETE}}" --title "Month of Life" --sport-type running
-          python run_page/gen_svg.py --from-db --type monthoflife --birth "${{env.BIRTHDAY_MONTH}}" --special-color "#f9d367"  --special-color2 "#f0a1a8" --output assets/mol_swimming.svg --use-localtime --athlete "${{env.ATHLETE}}" --title "Swimmer Month of Life" --sport-type swimming
-          python run_page/gen_svg.py --from-db --type monthoflife --birth "${{env.BIRTHDAY_MONTH}}" --special-color "#f9d367"  --special-color2 "#f0a1a8" --output assets/mol_skiing.svg --use-localtime --athlete "${{env.ATHLETE}}" --title "Skier Month of Life" --sport-type skiing
 
       - name: Make year summary
         if: env.GENERATE_MONTH_OF_LIFE == 'true'
@@ -287,9 +328,14 @@ jobs:
         run: |
           git config --local user.email 'action@github.com'
           git config --local user.name 'GitHub Action'
-          git add .
-          git commit -m 'update new runs' || echo 'nothing to commit'
-          git push || echo 'nothing to push'
+          git add src/static/activities.json assets garmin_activity_ids.json
+          if git diff --cached --quiet; then
+            echo 'nothing to commit'
+          else
+            git commit -m 'data: sync Garmin runs'
+            git pull --rebase origin master
+            git push origin HEAD:master
+          fi
 
       - name: Set Output
         id: set_output
