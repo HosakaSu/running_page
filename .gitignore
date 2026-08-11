@@ -41,3 +41,8 @@ Workouts/*
 !Workouts/.gitkeep
 activities/*
 !activities/.gitkeep
+
+# Local audit reports may contain precise personal location data
+reports/suspected_cycling_commutes_*.csv
+reports/suspected_cycling_commutes_*.md
+reports/commute_audit_config.json
