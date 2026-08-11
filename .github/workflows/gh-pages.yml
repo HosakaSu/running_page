@@ -99,6 +99,12 @@ jobs:
           VITE_MAPBOX_TOKEN: ${{ secrets.MAPBOX_TOKEN }}
         run: PATH_PREFIX=/$REPO_NAME pnpm build
 
+      - name: Add static entry points for browser routes
+        run: |
+          mkdir -p dist/summary
+          cp dist/index.html dist/summary/index.html
+          cp dist/index.html dist/404.html
+
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
