@@ -6,6 +6,7 @@ Copy most code from https://github.com/cyberjunky/python-garminconnect
 import argparse
 import asyncio
 import datetime as dt
+import json
 import logging
 import os
 
@@ -15,6 +16,7 @@ import time
 import traceback
 import zipfile
 from io import BytesIO
+from pathlib import Path
 from lxml import etree
 
 import aiofiles
@@ -22,12 +24,18 @@ import garth
 import httpx
 from config import FOLDER_DICT, JSON_FILE, SQL_FILE
 from garmin_device_adaptor import process_garmin_data
+from garmin_sync_state import load_activity_ids, save_activity_ids
+from merge_activity_json import merge_preserving_existing
+from restore_activity_database import restore_database_from_json
 from utils import make_activities_file
 
 # logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 TIME_OUT = httpx.Timeout(240.0, connect=360.0)
+GARMIN_SYNC_STATE_FILE = (
+    Path(__file__).resolve().parents[1] / "garmin_activity_ids.json"
+)
 GARMIN_COM_URL_DICT = {
     "SSO_URL_ORIGIN": "https://sso.garmin.com",
     "SSO_URL": "https://sso.garmin.com/sso",
@@ -435,7 +443,21 @@ if __name__ == "__main__":
     # make gpx or tcx dir
     if not os.path.exists(folder):
         os.mkdir(folder)
-    downloaded_ids = get_downloaded_ids(folder)
+
+    restored_count = restore_database_from_json(SQL_FILE, JSON_FILE)
+    if restored_count:
+        print(
+            f"Restored {restored_count} historical activities from "
+            f"{JSON_FILE} before Garmin sync"
+        )
+
+    # GPX/FIT files are intentionally ignored by Git.  The small tracked state
+    # file is the durable incremental marker on an ephemeral GitHub runner.
+    state_activity_ids = load_activity_ids(GARMIN_SYNC_STATE_FILE)
+    downloaded_ids = set(get_downloaded_ids(folder))
+    downloaded_ids.update(state_activity_ids)
+    with open(JSON_FILE, encoding="utf-8") as stream:
+        existing_activities = json.load(stream)
 
     if file_type == "fit":
         gpx_folder = FOLDER_DICT["gpx"]
@@ -443,7 +465,7 @@ if __name__ == "__main__":
             os.mkdir(gpx_folder)
         downloaded_gpx_ids = get_downloaded_ids(gpx_folder)
         # merge downloaded_ids:list
-        downloaded_ids = list(set(downloaded_ids + downloaded_gpx_ids))
+        downloaded_ids.update(downloaded_gpx_ids)
 
     loop = asyncio.get_event_loop()
     future = asyncio.ensure_future(
@@ -470,3 +492,15 @@ if __name__ == "__main__":
     make_activities_file(
         SQL_FILE, folder, JSON_FILE, file_suffix=file_type, activity_title_dict=id2title
     )
+
+    added_count = merge_preserving_existing(JSON_FILE, existing_activities)
+    print(f"Merged {added_count} new Garmin activities into {JSON_FILE}")
+
+    successful_ids = set(new_ids) & set(get_downloaded_ids(folder))
+    if save_activity_ids(
+        GARMIN_SYNC_STATE_FILE, state_activity_ids | successful_ids
+    ):
+        print(
+            f"Saved {len(state_activity_ids | successful_ids)} Garmin activity IDs "
+            f"to {GARMIN_SYNC_STATE_FILE}"
+        )
