@@ -4,10 +4,16 @@ Only the gpx files in GPX_OUT sync
 """
 
 import argparse
+from pathlib import Path
 
+from apply_activity_review import apply_review
 from config import GPX_FOLDER, JSON_FILE, SQL_FILE
 
 from utils import make_activities_file
+
+DEFAULT_ACTIVITY_REVIEW_FILE = (
+    Path(__file__).resolve().parents[1] / "activity_type_overrides.json"
+)
 
 
 def build_parser():
@@ -19,6 +25,26 @@ def build_parser():
         "--ignore-synced",
         action="store_true",
         help="Process every GPX without reading or updating imported.json.",
+    )
+    parser.add_argument(
+        "--activity-review-file",
+        type=Path,
+        default=(
+            DEFAULT_ACTIVITY_REVIEW_FILE
+            if DEFAULT_ACTIVITY_REVIEW_FILE.exists()
+            else None
+        ),
+        help="Reapply reviewed cycling/running types after importing GPX files.",
+    )
+    parser.add_argument(
+        "--include-reviewed-cycling",
+        action="store_true",
+        help="Include reviewed cycling in webpage JSON (default: running only).",
+    )
+    parser.add_argument(
+        "--skip-activity-review",
+        action="store_true",
+        help="Do not apply the repository's activity type overrides.",
     )
     return parser
 
@@ -32,3 +58,15 @@ if __name__ == "__main__":
         args.json_file,
         ignore_synced=args.ignore_synced,
     )
+    if args.activity_review_file and not args.skip_activity_review:
+        summary = apply_review(
+            Path(args.sql_file),
+            Path(args.json_file),
+            args.activity_review_file,
+            running_only_output=not args.include_reviewed_cycling,
+            backup_root=Path("reports/backups"),
+        )
+        print(
+            f"applied activity review: cycling={summary.cycling}, "
+            f"keep_running={summary.keep_running}, unsure={summary.unsure}"
+        )
