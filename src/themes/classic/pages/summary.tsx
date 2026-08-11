@@ -1,17 +1,18 @@
-import ActivityList from '../components/ActivityList';
 import { Helmet } from 'react-helmet-async';
+import ActivityList from '../components/ActivityList';
 import { useTheme } from '../hooks/useTheme';
 
-const SummaryPage = () => {
+const Summary = () => {
   const { theme } = useTheme();
+
   return (
     <>
       <Helmet>
-        <html data-theme={theme} />
+        <html lang="en" data-theme={theme} />
       </Helmet>
       <ActivityList />
     </>
   );
 };
 
-export default SummaryPage;
+export default Summary;
