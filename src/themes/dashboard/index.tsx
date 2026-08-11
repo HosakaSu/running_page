@@ -18,14 +18,8 @@ import { ProfileCard } from '@/components/ProfileCard';
 import { PersonalBest } from '@/components/PersonalBest';
 import { TracksPage } from '@/components/TracksPage';
 import { ChinaMap } from '@/components/ChinaMap';
-import { CyclingReviewPage } from '@/components/CyclingReviewPage';
 
-type Page = 'home' | 'tracks' | 'review';
-
-function initialPage(): Page {
-  const hash = window.location.hash.slice(1);
-  return hash === 'tracks' || hash === 'review' ? hash : 'home';
-}
+type Page = 'home' | 'tracks';
 
 function Dashboard() {
   const activities = getActivityData() as Activity[];
@@ -36,16 +30,7 @@ function Dashboard() {
     null
   );
   const [selectedProvince, setSelectedProvince] = useState<string | null>(null);
-  const [page, setPage] = useState<Page>(initialPage);
-
-  const navigate = (nextPage: Page) => {
-    setPage(nextPage);
-    window.history.replaceState(
-      null,
-      '',
-      nextPage === 'home' ? window.location.pathname : `#${nextPage}`
-    );
-  };
+  const [page, setPage] = useState<Page>('home');
 
   const years = getAvailableYears(activities);
   const filtered = useFilteredActivities(activities, filter, year);
@@ -66,17 +51,15 @@ function Dashboard() {
         toggleTheme={toggle}
         activities={activities}
         page={page}
-        onNavigate={navigate}
+        onNavigate={setPage}
       />
 
-      {page === 'review' ? (
-        <CyclingReviewPage />
-      ) : page === 'tracks' ? (
+      {page === 'tracks' ? (
         <TracksPage
           activities={filtered}
           filter={filter}
           onSelectActivity={setSelectedActivity}
-          onBack={() => navigate('home')}
+          onBack={() => setPage('home')}
         />
       ) : (
         <main className="mx-auto max-w-[1400px] px-6 py-6">
