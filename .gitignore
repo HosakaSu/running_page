@@ -46,3 +46,5 @@ activities/*
 reports/suspected_cycling_commutes_*.csv
 reports/suspected_cycling_commutes_*.md
 reports/commute_audit_config.json
+reports/cycling_review_decisions.json
+public/cycling-review.json

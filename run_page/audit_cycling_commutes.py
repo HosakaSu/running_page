@@ -27,6 +27,7 @@ DEFAULT_DATABASE = ROOT / "run_page" / "data.db"
 DEFAULT_OUTPUT = ROOT / "reports" / "suspected_cycling_commutes_2023_2025.csv"
 DEFAULT_SUMMARY = ROOT / "reports" / "suspected_cycling_commutes_2023_2025.md"
 DEFAULT_CONFIG = ROOT / "reports" / "commute_audit_config.json"
+DEFAULT_WEB_OUTPUT = ROOT / "public" / "cycling-review.json"
 YEARS = {2023, 2024, 2025}
 CORE_ENDPOINT_METRES = 500.0
 REVIEW_ENDPOINT_METRES = 750.0
@@ -331,6 +332,31 @@ def write_csv(rows: list[dict[str, object]], output: Path) -> None:
         writer.writerows(rows)
 
 
+def write_web_json(rows: list[dict[str, object]], output: Path) -> None:
+    """Write the non-location fields used by the local browser review page."""
+    fields = (
+        "run_id",
+        "confidence",
+        "route_group",
+        "direction",
+        "start_date_local",
+        "weekday",
+        "distance_km",
+        "moving_time",
+        "average_speed_mps",
+        "average_speed_kmh",
+        "endpoint_error_m",
+    )
+    output.parent.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "generated_at": dt.datetime.now().astimezone().isoformat(timespec="seconds"),
+        "records": [{field: row[field] for field in fields} for row in rows],
+    }
+    output.write_text(
+        json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+    )
+
+
 def write_summary(
     rows: list[dict[str, object]], unmatched: int, output: Path, csv_path: Path
 ) -> None:
@@ -379,6 +405,7 @@ def main() -> None:
     parser.add_argument("--config", type=Path, default=DEFAULT_CONFIG)
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
     parser.add_argument("--summary", type=Path, default=DEFAULT_SUMMARY)
+    parser.add_argument("--web-output", type=Path, default=DEFAULT_WEB_OUTPUT)
     args = parser.parse_args()
 
     routes, confirmed_rides = load_config(args.config)
@@ -389,8 +416,10 @@ def main() -> None:
         raise SystemExit("No suspected commute routes found")
     write_csv(rows, args.output)
     write_summary(rows, unmatched, args.summary, args.output)
+    write_web_json(rows, args.web_output)
     print(f"Wrote {len(rows)} candidates to {args.output}")
     print(f"Wrote summary to {args.summary}")
+    print(f"Wrote browser data to {args.web_output}")
 
 
 if __name__ == "__main__":
