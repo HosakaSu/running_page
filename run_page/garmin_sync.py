@@ -497,9 +497,7 @@ if __name__ == "__main__":
     print(f"Merged {added_count} new Garmin activities into {JSON_FILE}")
 
     successful_ids = set(new_ids) & set(get_downloaded_ids(folder))
-    if save_activity_ids(
-        GARMIN_SYNC_STATE_FILE, state_activity_ids | successful_ids
-    ):
+    if save_activity_ids(GARMIN_SYNC_STATE_FILE, state_activity_ids | successful_ids):
         print(
             f"Saved {len(state_activity_ids | successful_ids)} Garmin activity IDs "
             f"to {GARMIN_SYNC_STATE_FILE}"
