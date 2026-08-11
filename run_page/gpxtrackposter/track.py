@@ -456,17 +456,17 @@ class Track:
             )
             pass
 
-    @staticmethod
-    def _get_moving_data(gpx, moving_time):
+    def _get_moving_data(self, gpx, moving_time):
         moving_data = gpx.get_moving_data()
         elapsed_time = moving_data.moving_time
         moving_time = moving_time or elapsed_time
+        moving_distance = moving_data.moving_distance or self.length
         return {
-            "distance": moving_data.moving_distance,
+            "distance": moving_distance,
             "moving_time": datetime.timedelta(seconds=moving_time),
             "elapsed_time": datetime.timedelta(seconds=elapsed_time),
             "average_speed": (
-                moving_data.moving_distance / moving_time if moving_time else 0
+                moving_distance / moving_time if moving_time else 0
             ),
         }
 
