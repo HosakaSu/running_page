@@ -1,5 +1,4 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react';
-import { resetActivityData } from '../hooks/useActivities';
 
 interface Props {
   children: ReactNode;
@@ -11,8 +10,8 @@ interface State {
 
 /**
  * Catches render-time errors thrown by descendants (e.g. the Suspense data
- * source throwing a fetch error instead of a promise) so a failed
- * activities.json load degrades gracefully instead of blanking the page.
+ * source or a lazy theme import) so failed data, CSS, or JavaScript requests
+ * offer a way to recover instead of blanking the page.
  */
 export class ErrorBoundary extends Component<Props, State> {
   state: State = { hasError: false, message: '' };
@@ -29,8 +28,9 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   private handleRetry = () => {
-    resetActivityData();
-    this.setState({ hasError: false, message: '' });
+    // React.lazy caches rejected imports. Resetting the boundary alone cannot
+    // retry them; reload also fetches the current deployment's entry point.
+    window.location.reload();
   };
 
   render() {
@@ -47,7 +47,7 @@ export class ErrorBoundary extends Component<Props, State> {
             className="text-base font-medium"
             style={{ color: 'var(--color-text, #e6edf3)' }}
           >
-            Failed to load activities
+            Failed to load page
           </p>
           <p className="text-xs">{this.state.message}</p>
           <button
@@ -59,7 +59,7 @@ export class ErrorBoundary extends Component<Props, State> {
               color: 'var(--color-on-accent, #ffffff)',
             }}
           >
-            Retry
+            Reload page
           </button>
         </div>
       );
