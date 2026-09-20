@@ -104,8 +104,9 @@ jobs:
 
       - name: Add static entry points for browser routes
         run: |
-          mkdir -p dist/summary
+          mkdir -p dist/summary dist/tracks
           cp dist/index.html dist/summary/index.html
+          cp dist/index.html dist/tracks/index.html
           cp dist/index.html dist/404.html
 
       - name: Upload artifact
