@@ -1,4 +1,5 @@
 import datetime
+import os
 import random
 import string
 
@@ -28,6 +29,12 @@ def randomword():
 options.default_user_agent = "running_page"
 # reverse the location (lat, lon) -> location detail
 g = Nominatim(user_agent=randomword())
+
+SKIP_REVERSE_GEOCODING = os.getenv("SKIP_REVERSE_GEOCODING", "").lower() in {
+    "1",
+    "true",
+    "yes",
+}
 
 
 ACTIVITY_KEYS = [
@@ -106,7 +113,9 @@ def update_or_create_activity(session, run_activity):
             start_point = run_activity.start_latlng
             location_country = getattr(run_activity, "location_country", "")
             # or China for #176 to fix
-            if not location_country and start_point or location_country == "China":
+            if not SKIP_REVERSE_GEOCODING and (
+                (not location_country and start_point) or location_country == "China"
+            ):
                 try:
                     location_country = str(
                         g.reverse(
