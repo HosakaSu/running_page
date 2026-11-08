@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
+import maplibregl from 'maplibre-gl';
+import 'maplibre-gl/dist/maplibre-gl.css';
 import * as polyline from '@mapbox/polyline';
 import type { Activity } from '../types';
 import { hasRoute, routeForActivity } from '../core/routeFallback';
@@ -15,6 +17,18 @@ export interface RouteMapProps {
   dark?: boolean;
   onClearSelection?: () => void;
 }
+
+// Both renderers support these events, but their overloaded typings differ.
+type MapEvents = {
+  on(type: 'error', listener: (event: { error: Error }) => void): unknown;
+  on(type: 'idle' | 'style.load', listener: () => void): unknown;
+  once(type: 'styledataloading', listener: () => void): unknown;
+  off(type: 'error', listener: (event: { error: Error }) => void): unknown;
+  off(
+    type: 'idle' | 'style.load' | 'styledataloading',
+    listener: () => void
+  ): unknown;
+};
 
 const routeCache = new WeakMap<
   Activity,
@@ -36,9 +50,9 @@ export function RouteMapCanvas({
   const zh = locale === 'zh';
   const panelRef = useRef<HTMLElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const mapRef = useRef<mapboxgl.Map | null>(null);
+  const mapRef = useRef<mapboxgl.Map | maplibregl.Map | null>(null);
   const styleReadyRef = useRef(false);
-  const cameraRef = useRef<mapboxgl.CameraOptions | null>(null);
+  const cameraRef = useRef<maplibregl.CameraOptions | null>(null);
   const fittedRef = useRef<unknown>(null);
   const [provider, setProvider] = useState(MAPBOX_TOKEN ? 'mapbox' : 'carto');
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>(
@@ -98,7 +112,7 @@ export function RouteMapCanvas({
   }, [activities, selectedActivity, displayActivity]);
 
   const routeBounds = useMemo(() => {
-    const bounds = new mapboxgl.LngLatBounds();
+    const bounds = new maplibregl.LngLatBounds();
     for (const route of routes) {
       for (const coord of route.geometry.coordinates)
         bounds.extend(coord as [number, number]);
@@ -109,21 +123,27 @@ export function RouteMapCanvas({
   const fitRoutes = useCallback(() => {
     const map = mapRef.current;
     if (!map || routeBounds.isEmpty()) return;
-    map.fitBounds(routeBounds, {
-      padding: { top: 35, bottom: 35, left: 35, right: 65 },
-      maxZoom: selectedActivity ? 16 : 13,
-      duration: window.matchMedia('(prefers-reduced-motion: reduce)').matches
-        ? 0
-        : 500,
-    });
+    map.fitBounds(
+      routeBounds.toArray() as [[number, number], [number, number]],
+      {
+        padding: { top: 35, bottom: 35, left: 35, right: 65 },
+        maxZoom: selectedActivity ? 16 : 13,
+        duration: window.matchMedia('(prefers-reduced-motion: reduce)').matches
+          ? 0
+          : 500,
+      }
+    );
   }, [routeBounds, selectedActivity]);
 
   const drawRoutes = useCallback(() => {
     const map = mapRef.current;
     if (!map || !styleReadyRef.current) return;
     const data = { type: 'FeatureCollection' as const, features: routes };
-    const source = map.getSource('routes') as
-      mapboxgl.GeoJSONSource | undefined;
+    const source = (
+      map instanceof mapboxgl.Map
+        ? map.getSource('routes')
+        : map.getSource('routes')
+    ) as mapboxgl.GeoJSONSource | maplibregl.GeoJSONSource | undefined;
     if (source) source.setData(data);
     else {
       map.addSource('routes', { type: 'geojson', data });
@@ -155,12 +175,10 @@ export function RouteMapCanvas({
 
   useEffect(() => {
     if (!containerRef.current || !panelRef.current) return;
-    const map = new mapboxgl.Map({
+    const options = {
       container: containerRef.current,
-      accessToken: MAPBOX_TOKEN,
-      language: zh ? 'zh-Hans' : 'en',
-      style: { version: 8, sources: {}, layers: [] },
-      center: [121.4, 31.2],
+      style: { version: 8 as const, sources: {}, layers: [] },
+      center: [121.4, 31.2] as [number, number],
       zoom: 10,
       ...cameraRef.current,
       locale: zh
@@ -173,23 +191,44 @@ export function RouteMapCanvas({
             'FullscreenControl.Exit': '退出全屏',
             'AttributionControl.ToggleAttribution': '地图来源',
           }
-        : {},
-    });
+        : undefined,
+    };
+    // Mapbox GL JS requires a token even when rendering third-party tiles.
+    const map =
+      provider === 'mapbox'
+        ? new mapboxgl.Map({
+            ...options,
+            accessToken: MAPBOX_TOKEN,
+            language: zh ? 'zh-Hans' : 'en',
+          })
+        : new maplibregl.Map(options);
     mapRef.current = map;
-    map.addControl(new mapboxgl.NavigationControl(), 'top-right');
-    map.addControl(
-      new mapboxgl.FullscreenControl({ container: panelRef.current }),
-      'top-right'
-    );
-    map.addControl(
-      new mapboxgl.ScaleControl({ unit: 'metric', maxWidth: 90 }),
-      'bottom-left'
-    );
+    if (map instanceof mapboxgl.Map) {
+      map.addControl(new mapboxgl.NavigationControl(), 'top-right');
+      map.addControl(
+        new mapboxgl.FullscreenControl({ container: panelRef.current }),
+        'top-right'
+      );
+      map.addControl(
+        new mapboxgl.ScaleControl({ unit: 'metric', maxWidth: 90 }),
+        'bottom-left'
+      );
+    } else {
+      map.addControl(new maplibregl.NavigationControl(), 'top-right');
+      map.addControl(
+        new maplibregl.FullscreenControl({ container: panelRef.current }),
+        'top-right'
+      );
+      map.addControl(
+        new maplibregl.ScaleControl({ unit: 'metric', maxWidth: 90 }),
+        'bottom-left'
+      );
+    }
     const observer = new ResizeObserver(() => map.resize());
     observer.observe(containerRef.current);
     return () => {
       cameraRef.current = {
-        center: map.getCenter(),
+        center: map.getCenter().toArray(),
         zoom: map.getZoom(),
         bearing: map.getBearing(),
         pitch: map.getPitch(),
@@ -198,15 +237,21 @@ export function RouteMapCanvas({
       map.remove();
       mapRef.current = null;
     };
-  }, [zh]);
+  }, [zh, provider]);
 
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
+    const events: MapEvents = map;
     let failed = false;
-    const onError = (event: mapboxgl.ErrorEvent) => {
+    const onError = (event: { error: Error }) => {
       const code = (event.error as Error & { status?: number }).status;
-      if (provider === 'mapbox' && (code === 401 || code === 403)) {
+      if (
+        provider === 'mapbox' &&
+        (code === 401 ||
+          code === 403 ||
+          event.error.message.includes('Mapbox access token'))
+      ) {
         setProvider('carto');
       } else {
         failed = true;
@@ -217,9 +262,9 @@ export function RouteMapCanvas({
       if (!failed) setStatus('ready');
     };
     const onLoading = () => setStatus('loading');
-    map.on('error', onError);
-    map.on('idle', onIdle);
-    map.once('styledataloading', onLoading);
+    events.on('error', onError);
+    events.on('idle', onIdle);
+    events.once('styledataloading', onLoading);
     styleReadyRef.current = false;
     map.setStyle(style, {
       diff: false,
@@ -231,23 +276,24 @@ export function RouteMapCanvas({
     }, 15000);
     return () => {
       window.clearTimeout(timer);
-      map.off('error', onError);
-      map.off('idle', onIdle);
-      map.off('styledataloading', onLoading);
+      events.off('error', onError);
+      events.off('idle', onIdle);
+      events.off('styledataloading', onLoading);
     };
   }, [style, provider, retry, zh]);
 
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
+    const events: MapEvents = map;
     const onStyleLoad = () => {
       styleReadyRef.current = true;
       drawRoutes();
     };
-    map.on('style.load', onStyleLoad);
+    events.on('style.load', onStyleLoad);
     drawRoutes();
     return () => {
-      map.off('style.load', onStyleLoad);
+      events.off('style.load', onStyleLoad);
     };
   }, [drawRoutes, style, retry, zh]);
 
